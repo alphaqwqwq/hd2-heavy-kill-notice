@@ -17,6 +17,9 @@
 
 紧凑（去动词）：alphaQAQ · 强袭虫 · EAT-17
 里程碑（每 N 杀才播报）：alphaQAQ 干掉了 5 个重甲单位，才刚热身
+
+默认（最简双语 + P 编号）：P2 · 强袭虫/Charger · EAT-17
+连杀（里程碑模式）：P2 连宰 3 只重甲！ | P2 took down 3 heavies in a row!
 ```
 
 - 覆盖 **32 种重甲**（强袭虫 / 孢子强袭虫 / 巨兽级强袭虫 / 穿刺虫 / 吐酸泰坦 / 霸王虫 /
@@ -29,7 +32,7 @@
 ## 安装 / 使用
 
 1. 需要 **Bingus Shared Loader（API 1）** 与 **HD2Runtime**。
-2. 用 **HD2 Arsenal** 导入 `dist/HeavyKillNotice-v1.6.0.zip` → 启用 → **Deploy**。
+2. 用 **HD2 Arsenal** 导入 `dist/HeavyKillNotice-v1.7.0.zip` → 启用 → **Deploy**。
 3. 进任务，打死一只重甲即可 —— **装好即用，不需要按任何键**。
 
 ## 选项（Escape > MODS > Heavy Kill Notice）
@@ -40,12 +43,14 @@
 |---|---|---|
 | Enabled / 启用 | 开 | 总开关 |
 | Chat broadcast / 播报方式 | 智能 | 智能（房主全部 / 客机只播报自己的击杀）/ 仅房主 / 每人 / 关闭 |
-| Language / 语言 | 简体中文 | 中 / 英 / 双语（中英同一行） |
+| Language / 语言 | 双语 | 中 / 英 / **双语**（默认；菜单与播报都双语，任何语言的玩家都能读） |
 | Include weapon / 含武器 | 开 | 关掉就是「谁 击杀了 什么」 |
 | Weapon source / 武器来源 | 仅精确 | 仅精确（抓不到就隐藏武器）/ 精确否则手持 / 仅手持 |
 | Min gap / 最小间隔 | 1.0 s | 两次播报的最小间隔（防刷屏） |
-| Display / 显示方式 | 完整 | 完整（每次击杀一行）/ **紧凑**（去动词，`A · 强袭虫 · EAT-17`）/ **里程碑**（每 N 杀才播报，风格化叙事） |
+| Display / 显示方式 | 紧凑 | 完整（每次击杀一行）/ **紧凑**（默认；去动词短行 `P2 · 强袭虫 · EAT-17`）/ **里程碑**（每 N 杀才播报，风格化叙事） |
 | Milestone step / 里程碑步长 | 5 | 里程碑模式下每 N 杀播报一次（5、10、15…）。称赞随累计升级：5=才刚热身 … 40=超标发挥 … 50=反重之神 |
+| Player name / 玩家名 | P1-P4 | **编号**（默认；游戏内可见的 P1~P4，短且不分语言）/ 完整名字 |
+| Combo line / 连杀提示 | 开 | 里程碑模式下，短时间（~3s）连宰 ≥3 只时额外冒一句 `P2 连宰 3 只重甲！` |
 | Test key (F9) / 测试键 | 关 | 排障用，按 F9 发一条测试消息 |
 | Kill count / 击杀计数 | 关 | 按种类 / 本局总数 / 两者 |
 
@@ -80,7 +85,7 @@
 **日志里最关键的行**（搜 `heavy kill notice`）：
 
 ```
-heavy kill notice ready v1.6.0 (events=.. host=.. chat=.. names=..)   # 是否成功加载、是否房主、聊天是否可用、读到几个玩家名
+heavy kill notice ready v1.7.0 (events=.. host=.. chat=.. names=..)   # 是否成功加载、是否房主、聊天是否可用、读到几个玩家名
 heavy kill notice: killed #N: type=.. hx=.. heavy=.. peer=.. local_killer=.. enabled=..   # 每次击杀的判定链路
 heavy kill notice: queued (.. weapon_src=damage|held, weapon=<hex>, killer_count=..)      # 武器来自哪条来源
 heavy kill notice broadcast: <文本>            # 真正发出的内容

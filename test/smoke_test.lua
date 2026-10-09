@@ -201,6 +201,12 @@ local M = loadmod()
 check('correct build -> table', type(M), 'table')
 check('events subscribed', M.has_events, true)
 
+-- new defaults: simplest bilingual out of the box
+check('default language = bilingual', values.language, 3)
+check('default display = compact', values.display, 2)
+check('default name style = P#', values.name_style, 2)
+values.language = 2; values.display = 1; values.name_style = 1; values.combo = false
+
 local function tick(n) for _ = 1, n do for _, fn in ipairs(every_cbs) do fn() end end end
 
 -- 3) heavy kill -> broadcast with roster name
@@ -383,6 +389,7 @@ mission_cb()                                  -- reset counts
 values.display = 3
 values.milestone_step = 5
 values.language = 2
+values.combo = false
 sends = {}
 for _ = 1, 5 do killed_cb({ type = '1A7FCDFF98C664B0', killer_peer = '0000000111111111' }) end
 tick(40)
@@ -400,6 +407,33 @@ end
 check('milestone: 40', sends[8] and (sends[8].text:find('干掉了 40 个重甲单位', 1, true) ~= nil), true)
 check('milestone: praise 40', sends[8] and (sends[8].text:find('超标发挥', 1, true) ~= nil), true)
 values.display = 1
+
+-- 17) P1-P4 player name (in-game number)
+tick(40)
+sends = {}
+values.language = 1
+values.display = 1
+values.name_style = 2
+local killer_slot = { avatar = function() return { id = AVATAR } end, slot = 1 }
+killed_cb({ type = '1A7FCDFF98C664B0', killer_peer = '0000000111111111', killer = killer_slot })
+tick(40)
+check('P# name used', sends[1] and (sends[1].text:find('P2', 1, true) ~= nil), true)
+values.name_style = 1
+
+-- 18) combo line (Milestones + combo: several in a row)
+mission_cb()
+values.display = 3
+values.milestone_step = 100
+values.combo = true
+values.language = 1
+sends = {}
+for _ = 1, 3 do killed_cb({ type = '1A7FCDFF98C664B0', killer_peer = '0000000111111111' }) end
+tick(40)
+check('combo sent', #sends, 1)
+check('combo text', sends[1] and (sends[1].text:find('in a row', 1, true) ~= nil), true)
+values.display = 1
+values.combo = false
+values.milestone_step = 5
 
 out[#out + 1] = fails == 0 and 'RESULT: ALL PASS' or ('RESULT: ' .. fails .. ' FAILURES')
 return table.concat(out, '\n')

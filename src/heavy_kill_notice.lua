@@ -367,8 +367,8 @@ local chatMode = options:choice({ id = 'chat_mode', label = 'Chat broadcast / �
     choices = { 'Smart (host all / client own) / 智能', 'Host only / 仅房主', 'Everyone / 每人', 'Off / 关闭' }, default = 1,
     description = 'Smart: host announces all, a client only its own (no duplicates). 智能：房主播报全部，客机只播报自己的击杀。' })
 local lang = options:choice({ id = 'language', label = 'Language / 语言',
-    choices = { 'English', '简体中文', 'Bilingual / 双语' }, default = 2,
-    description = 'Broadcast language. Bilingual puts both on one line. 播报语言；双语=中英同一行。' })
+    choices = { 'English', '简体中文', 'Bilingual / 双语' }, default = 3,
+    description = 'Menu and broadcast language. Bilingual puts both on one line. 菜单与播报语言；双语=中英同一行。' })
 local showWeapon = options:toggle({ id = 'show_weapon', label = 'Include weapon / 含武器', default = true,
     description = 'Off: only who killed what. 关闭：只显示「谁 击杀了 什么」。' })
 local weaponSource = options:choice({ id = 'weapon_source', label = 'Weapon source / 武器来源',
@@ -381,10 +381,15 @@ local countMode = options:choice({ id = 'count_mode', label = 'Kill count / 击�
     choices = { 'Off / 关', 'Per type / 按种类', 'Per-mission total / 本局总数', 'Both / 两者' }, default = 1,
     description = 'Append this mission tally per killer. 在播报末尾加该击杀者本局的重甲统计；每局重置。' })
 local display = options:choice({ id = 'display', label = 'Display / 显示方式',
-    choices = { 'Full / 完整', 'Compact / 紧凑', 'Milestones / 里程碑' }, default = 1,
-    description = 'Full: one line per kill. Compact: a short line with no verbs (A · Charger · EAT-17). Milestones: only announce every N kills, with a bit of flavour. 完整=每次击杀一行；紧凑=去掉动词的短行；里程碑=每 N 杀才播报一次。' })
+    choices = { 'Full / 完整', 'Compact / 紧凑', 'Milestones / 里程碑' }, default = 2,
+    description = 'Full: one line per kill. Compact: a short line with no verbs (P2 · Charger · EAT-17). Milestones: only announce every N kills, with a bit of flavour. 完整=每次击杀一行；紧凑=去掉动词的短行；里程碑=每 N 杀才播报一次。' })
 local milestoneStep = options:slider({ id = 'milestone_step', label = 'Milestone step / 里程碑步长', min = 1, max = 50, step = 1, default = 5,
     description = 'In Milestones mode, announce every N kills (5, 10, 15...). 里程碑模式下每 N 杀播报一次。' })
+local nameStyle = options:choice({ id = 'name_style', label = 'Player name / 玩家名',
+    choices = { 'Full name / 完整名字', 'P1-P4 / 编号' }, default = 2,
+    description = 'P1-P4 uses the in-game player number (short and language-neutral). 编号=P1~P4（游戏内可见，短且不分语言）。' })
+local combo = options:toggle({ id = 'combo', label = 'Combo line / 连杀提示', default = true,
+    description = 'In Milestones mode, add one flavoured line when a player kills several heavies in a row. 里程碑模式下，短时间连杀重甲时额外冒一句。' })
 
 -- === menu language hot-switch (BFV Kill Feedback's method) =====================================
 -- Mod Options Menu registers option specs once and has no relabel API, but it keeps them in a
@@ -407,6 +412,9 @@ local UI = {
         display = { label = 'Display', desc = 'Full: one line per kill. Compact: a short line with no verbs. Milestones: only every N kills.',
             choices = { 'Full', 'Compact', 'Milestones' } },
         milestone_step = { label = 'Milestone step', desc = 'In Milestones mode, announce every N kills (5, 10, 15...).' },
+        name_style = { label = 'Player name', desc = 'P1-P4 uses the in-game player number (short and language-neutral).',
+            choices = { 'Full name', 'P1-P4' } },
+        combo = { label = 'Combo line', desc = 'In Milestones mode, add one flavoured line when a player kills several heavies in a row.' },
     },
     zh = {
         title = '重甲击杀播报',
@@ -424,9 +432,12 @@ local UI = {
         display = { label = '显示方式', desc = '完整=每次击杀一行；紧凑=去掉动词的短行；里程碑=每 N 杀才播报一次。',
             choices = { '完整', '紧凑', '里程碑' } },
         milestone_step = { label = '里程碑步长', desc = '里程碑模式下每 N 杀播报一次（5、10、15…）。' },
+        name_style = { label = '玩家名', desc = '编号=P1~P4（游戏内可见，短且不分语言）。',
+            choices = { '完整名字', '编号' } },
+        combo = { label = '连杀提示', desc = '里程碑模式下，短时间连杀重甲时额外冒一句。' },
     },
 }
-local UI_KEYS = { 'enabled', 'chat_mode', 'language', 'show_weapon', 'weapon_source', 'gap', 'test_key', 'count_mode', 'display', 'milestone_step' }
+local UI_KEYS = { 'enabled', 'chat_mode', 'language', 'show_weapon', 'weapon_source', 'gap', 'test_key', 'count_mode', 'display', 'milestone_step', 'name_style', 'combo' }
 local ui_wanted = {}
 for _, k in ipairs(UI_KEYS) do ui_wanted['heavy_kill_notice.' .. k] = k end
 local ui_state, ui_last_lang, ui_next_probe = nil, nil, -1e9
@@ -545,9 +556,7 @@ local function compose_lang(who, victim, weapon, code, compact)
     end
 end
 
-local function compose(killer_peer, victim_hex, weapon_hex, per_count, total_count, compact)
-    local nm = refresh_names(clock)
-    local who = nm[killer_peer] or ('Player ' .. tostring(killer_peer):sub(-4))
+local function compose(who, victim_hex, weapon_hex, per_count, total_count, compact)
     local victim = CATALOG[victim_hex]
     local weapon
     if showWeapon:get() ~= false then weapon = weapon_hex and weapon_name_for(weapon_hex) end
@@ -596,15 +605,36 @@ local function praise_for(level, code)
     if level > #list then level = #list end
     return list[level]
 end
-local function compose_milestone(killer_peer, total, step)
-    local nm = refresh_names(clock)
-    local who = nm[killer_peer] or ('Player ' .. tostring(killer_peer):sub(-4))
+local function compose_milestone(who, total, step)
     local level = math.floor(total / step)
     local function line(code)
         if code == 'zh' then
             return string.format('%s 干掉了 %d 个重甲单位，%s', who, total, praise_for(level, 'zh'))
         end
         return string.format('%s has taken down %d heavies - %s', who, total, praise_for(level, 'en'))
+    end
+    local mode = lang:get()
+    if mode == 2 then return line('zh') end
+    if mode == 3 then return line('zh') .. ' | ' .. line('en') end
+    return line('en')
+end
+
+-- Who to name: the full roster name, or the in-game player number P1-P4 (short, language-neutral).
+local function who_for(peer, killer)
+    if nameStyle:get() == 2 then
+        local slot = killer and tonumber(killer.slot)
+        if slot then return 'P' .. (slot + 1) end
+    end
+    local nm = refresh_names(clock)
+    return nm[peer] or ('Player ' .. tostring(peer):sub(-4))
+end
+
+-- Combo flavour (Milestones mode): several heavies down in a row.
+local COMBO_WINDOW, COMBO_N, COMBO_COOLDOWN = 3.0, 3, 6.0
+local function compose_combo(who, n)
+    local function line(code)
+        if code == 'zh' then return string.format('%s 连宰 %d 只重甲！', who, n) end
+        return string.format('%s took down %d heavies in a row!', who, n)
     end
     local mode = lang:get()
     if mode == 2 then return line('zh') end
@@ -689,20 +719,37 @@ local function on_killed(e)
         end
     end
     local c = counts[peer]
-    if not c then c = { types = {}, total = 0 }; counts[peer] = c end
+    if not c then c = { types = {}, total = 0, times = {} }; counts[peer] = c end
     c.types[hx] = (c.types[hx] or 0) + 1
     c.total = c.total + 1
+    local who = who_for(peer, e.killer)
     local style = display:get()
     if style == 3 then                                            -- Milestones: only every N kills
         local step = math.floor(tonumber(milestoneStep:get()) or 5)
         if step < 1 then step = 1 end
         if c.total % step == 0 then
-            enqueue(compose_milestone(peer, c.total, step), e.local_killer == true)
+            enqueue(compose_milestone(who, c.total, step), e.local_killer == true)
             diag('queued', 'heavy kill notice: milestone queued (total=' .. c.total .. ')')
+        end
+        if combo:get() == true then                               -- combo flavour: several in a row
+            local times = c.times or {}
+            c.times = times
+            times[#times + 1] = clock
+            local cutoff, keep = clock - COMBO_WINDOW, 0
+            for i = 1, #times do
+                if times[i] >= cutoff then keep = keep + 1; times[keep] = times[i] end
+            end
+            for i = #times, keep + 1, -1 do times[i] = nil end
+            if keep >= COMBO_N and (clock - (c.last_combo or -1e9)) >= COMBO_COOLDOWN then
+                c.last_combo = clock
+                c.times = {}
+                enqueue(compose_combo(who, keep), e.local_killer == true)
+                diag('queued', 'heavy kill notice: combo queued (n=' .. keep .. ')')
+            end
         end
         return
     end
-    enqueue(compose(peer, hx, weapon_hex, c.types[hx], c.total, style == 2), e.local_killer == true)
+    enqueue(compose(who, hx, weapon_hex, c.types[hx], c.total, style == 2), e.local_killer == true)
     diag('queued', 'heavy kill notice: queued (q=' .. #queue .. ', weapon_src=' .. tostring(source) ..
         ', weapon=' .. tostring(weapon_hex) .. ', killer_count=' .. c.types[hx] .. '/' .. c.total .. ')')
 end
@@ -738,12 +785,12 @@ local function chat_on()
     return e ~= nil and e % 256 ~= 0
 end
 local state = {
-    version = '1.6.1',
+    version = '1.7.0',
     ready = true,
     has_events = eventsReady,
 }
 rawset(_G, key, state)
-mod:log(string.format('heavy kill notice ready v1.6.1 (events=%s host=%s chat=%s names=%d)',
+mod:log(string.format('heavy kill notice ready v1.7.0 (events=%s host=%s chat=%s names=%d)',
     tostring(eventsReady), tostring(is_host()), tostring(chat_on()), ready_names))
 if rawget(_G, 'HeavyKillNoticeTest') then
     state._test = { queue = queue, pump = pump, is_host = is_host, compose = compose,
