@@ -364,5 +364,36 @@ check('menu label -> bilingual', spec.label, 'Enabled / 启用')
 values.language = 2
 _G.ModOptionsMenu = nil
 
+-- 15) compact display: no verbs, separator style
+tick(40)
+sends = {}
+values.display = 2
+values.language = 2
+values.count_mode = 1
+killed_cb({ type = '1A7FCDFF98C664B0', killer_peer = '0000000111111111', entity_id = VICTIM, killer = killer })
+tick(40)
+check('compact sent', #sends, 1)
+check('compact: no verb', sends[1] and (sends[1].text:find('击杀了', 1, true) == nil), true)
+check('compact: separator', sends[1] and (sends[1].text:find(' · ', 1, true) ~= nil), true)
+check('compact: has weapon', sends[1] and (sends[1].text:find('EAT-17', 1, true) ~= nil), true)
+values.display = 1
+
+-- 16) milestones: only every N kills, with flavour
+mission_cb()                                  -- reset counts
+values.display = 3
+values.milestone_step = 5
+values.language = 2
+sends = {}
+for _ = 1, 5 do killed_cb({ type = '1A7FCDFF98C664B0', killer_peer = '0000000111111111' }) end
+tick(40)
+check('milestone: one line for 5 kills', #sends, 1)
+check('milestone: counts 5', sends[1] and (sends[1].text:find('干掉了 5 个重甲单位', 1, true) ~= nil), true)
+check('milestone: praise 1', sends[1] and (sends[1].text:find('干得不错', 1, true) ~= nil), true)
+for _ = 6, 10 do killed_cb({ type = '1A7FCDFF98C664B0', killer_peer = '0000000111111111' }) end
+tick(40)
+check('milestone: counts 10', sends[2] and (sends[2].text:find('干掉了 10 个重甲单位', 1, true) ~= nil), true)
+check('milestone: praise 2', sends[2] and (sends[2].text:find('相当好', 1, true) ~= nil), true)
+values.display = 1
+
 out[#out + 1] = fails == 0 and 'RESULT: ALL PASS' or ('RESULT: ' .. fails .. ' FAILURES')
 return table.concat(out, '\n')

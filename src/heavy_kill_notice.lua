@@ -380,6 +380,11 @@ local testKey = options:toggle({ id = 'test_key', label = 'Test key F9 / 测试�
 local countMode = options:choice({ id = 'count_mode', label = 'Kill count / 击杀计数',
     choices = { 'Off / 关', 'Per type / 按种类', 'Per-mission total / 本局总数', 'Both / 两者' }, default = 1,
     description = 'Append this mission tally per killer. 在播报末尾加该击杀者本局的重甲统计；每局重置。' })
+local display = options:choice({ id = 'display', label = 'Display / 显示方式',
+    choices = { 'Full / 完整', 'Compact / 紧凑', 'Milestones / 里程碑' }, default = 1,
+    description = 'Full: one line per kill. Compact: a short line with no verbs (A · Charger · EAT-17). Milestones: only announce every N kills, with a bit of flavour. 完整=每次击杀一行；紧凑=去掉动词的短行；里程碑=每 N 杀才播报一次。' })
+local milestoneStep = options:slider({ id = 'milestone_step', label = 'Milestone step / 里程碑步长', min = 1, max = 50, step = 1, default = 5,
+    description = 'In Milestones mode, announce every N kills (5, 10, 15...). 里程碑模式下每 N 杀播报一次。' })
 
 -- === menu language hot-switch (BFV Kill Feedback's method) =====================================
 -- Mod Options Menu registers option specs once and has no relabel API, but it keeps them in a
@@ -399,6 +404,9 @@ local UI = {
         test_key = { label = 'Test key (F9)', desc = 'F9 sends one test line. Troubleshooting only.' },
         count_mode = { label = 'Kill count', desc = 'Per-mission tally appended to each line.',
             choices = { 'Off', 'Per type', 'Per-mission total', 'Both' } },
+        display = { label = 'Display', desc = 'Full: one line per kill. Compact: a short line with no verbs. Milestones: only every N kills.',
+            choices = { 'Full', 'Compact', 'Milestones' } },
+        milestone_step = { label = 'Milestone step', desc = 'In Milestones mode, announce every N kills (5, 10, 15...).' },
     },
     zh = {
         title = '重甲击杀播报',
@@ -413,9 +421,12 @@ local UI = {
         test_key = { label = '测试键 (F9)', desc = '按 F9 发一条测试消息，仅排障用。' },
         count_mode = { label = '击杀计数', desc = '在播报末尾加该击杀者本局的重甲统计。',
             choices = { '关闭', '按种类', '本局总数', '两者' } },
+        display = { label = '显示方式', desc = '完整=每次击杀一行；紧凑=去掉动词的短行；里程碑=每 N 杀才播报一次。',
+            choices = { '完整', '紧凑', '里程碑' } },
+        milestone_step = { label = '里程碑步长', desc = '里程碑模式下每 N 杀播报一次（5、10、15…）。' },
     },
 }
-local UI_KEYS = { 'enabled', 'chat_mode', 'language', 'show_weapon', 'weapon_source', 'gap', 'test_key', 'count_mode' }
+local UI_KEYS = { 'enabled', 'chat_mode', 'language', 'show_weapon', 'weapon_source', 'gap', 'test_key', 'count_mode', 'display', 'milestone_step' }
 local ui_wanted = {}
 for _, k in ipairs(UI_KEYS) do ui_wanted['heavy_kill_notice.' .. k] = k end
 local ui_state, ui_last_lang, ui_next_probe = nil, nil, -1e9
@@ -512,7 +523,8 @@ local function localize(entry)
 end
 
 -- One line in one language. who is the roster name (same in both); victim/weapon have zh+en names.
-local function compose_lang(who, victim, weapon, code)
+-- compact = drop the verbs and join with separators: "A · Charger · EAT-17".
+local function compose_lang(who, victim, weapon, code, compact)
     local function name(entry)
         if not entry then return nil end
         if code == 'zh' then return entry.zh or entry.en end
@@ -520,6 +532,10 @@ local function compose_lang(who, victim, weapon, code)
     end
     local vname = name(victim) or (code == 'zh' and '重甲单位' or 'Heavy unit')
     local wname = name(weapon)
+    if compact then
+        if wname then return string.format('%s · %s · %s', who, vname, wname) end
+        return string.format('%s · %s', who, vname)
+    end
     if code == 'zh' then
         if wname then return string.format('%s 用 %s 击杀了 %s', who, wname, vname) end
         return string.format('%s 击杀了 %s', who, vname)
@@ -529,7 +545,7 @@ local function compose_lang(who, victim, weapon, code)
     end
 end
 
-local function compose(killer_peer, victim_hex, weapon_hex, per_count, total_count)
+local function compose(killer_peer, victim_hex, weapon_hex, per_count, total_count, compact)
     local nm = refresh_names(clock)
     local who = nm[killer_peer] or ('Player ' .. tostring(killer_peer):sub(-4))
     local victim = CATALOG[victim_hex]
@@ -549,12 +565,49 @@ local function compose(killer_peer, victim_hex, weapon_hex, per_count, total_cou
         return ' ' .. table.concat(parts, ' / ')
     end
     local mode = lang:get()
-    if mode == 2 then return compose_lang(who, victim, weapon, 'zh') .. suffix('zh') end
+    if mode == 2 then return compose_lang(who, victim, weapon, 'zh', compact) .. suffix('zh') end
     if mode == 3 then                                            -- Bilingual
-        return compose_lang(who, victim, weapon, 'zh') .. suffix('zh') .. ' | ' ..
-               compose_lang(who, victim, weapon, 'en') .. suffix('en')
+        if compact then                                          -- one short line: 中文名/English
+            local function both(entry)
+                if not entry then return nil end
+                return (entry.zh or entry.en) .. '/' .. (entry.en or entry.zh)
+            end
+            local vname = both(victim) or '重甲/Heavy'
+            local wname = weapon and both(weapon)
+            local line = wname and string.format('%s · %s · %s', who, vname, wname) or string.format('%s · %s', who, vname)
+            return line .. suffix('zh')
+        end
+        return compose_lang(who, victim, weapon, 'zh', false) .. suffix('zh') .. ' | ' ..
+               compose_lang(who, victim, weapon, 'en', false) .. suffix('en')
     end
-    return compose_lang(who, victim, weapon, 'en') .. suffix('en')
+    return compose_lang(who, victim, weapon, 'en', compact) .. suffix('en')
+end
+
+-- Milestones mode: a bit of flavour instead of a serious per-kill report.
+local MILESTONE_PRAISE = {
+    zh = { '干得不错', '相当好', '太猛了', '重甲克星', '传说级' },
+    en = { 'nice', 'impressive', 'on fire', 'heavy slayer', 'legendary' },
+}
+local function praise_for(level, code)
+    local list = MILESTONE_PRAISE[code]
+    if level < 1 then level = 1 end
+    if level > #list then level = #list end
+    return list[level]
+end
+local function compose_milestone(killer_peer, total, step)
+    local nm = refresh_names(clock)
+    local who = nm[killer_peer] or ('Player ' .. tostring(killer_peer):sub(-4))
+    local level = math.floor(total / step)
+    local function line(code)
+        if code == 'zh' then
+            return string.format('%s 干掉了 %d 个重甲单位，%s', who, total, praise_for(level, 'zh'))
+        end
+        return string.format('%s has taken down %d heavies - %s', who, total, praise_for(level, 'en'))
+    end
+    local mode = lang:get()
+    if mode == 2 then return line('zh') end
+    if mode == 3 then return line('zh') .. ' | ' .. line('en') end
+    return line('en')
 end
 
 local function enqueue(text, mine)
@@ -637,7 +690,17 @@ local function on_killed(e)
     if not c then c = { types = {}, total = 0 }; counts[peer] = c end
     c.types[hx] = (c.types[hx] or 0) + 1
     c.total = c.total + 1
-    enqueue(compose(peer, hx, weapon_hex, c.types[hx], c.total), e.local_killer == true)
+    local style = display:get()
+    if style == 3 then                                            -- Milestones: only every N kills
+        local step = math.floor(tonumber(milestoneStep:get()) or 5)
+        if step < 1 then step = 1 end
+        if c.total % step == 0 then
+            enqueue(compose_milestone(peer, c.total, step), e.local_killer == true)
+            diag('queued', 'heavy kill notice: milestone queued (total=' .. c.total .. ')')
+        end
+        return
+    end
+    enqueue(compose(peer, hx, weapon_hex, c.types[hx], c.total, style == 2), e.local_killer == true)
     diag('queued', 'heavy kill notice: queued (q=' .. #queue .. ', weapon_src=' .. tostring(source) ..
         ', weapon=' .. tostring(weapon_hex) .. ', killer_count=' .. c.types[hx] .. '/' .. c.total .. ')')
 end
@@ -673,12 +736,12 @@ local function chat_on()
     return e ~= nil and e % 256 ~= 0
 end
 local state = {
-    version = '1.5.0',
+    version = '1.6.0',
     ready = true,
     has_events = eventsReady,
 }
 rawset(_G, key, state)
-mod:log(string.format('heavy kill notice ready v1.5.0 (events=%s host=%s chat=%s names=%d)',
+mod:log(string.format('heavy kill notice ready v1.6.0 (events=%s host=%s chat=%s names=%d)',
     tostring(eventsReady), tostring(is_host()), tostring(chat_on()), ready_names))
 if rawget(_G, 'HeavyKillNoticeTest') then
     state._test = { queue = queue, pump = pump, is_host = is_host, compose = compose,
