@@ -584,9 +584,11 @@ local function compose(killer_peer, victim_hex, weapon_hex, per_count, total_cou
 end
 
 -- Milestones mode: a bit of flavour instead of a serious per-kill report.
+-- Calibrated so a dedicated anti-heavy run (20-40 heavies a match) reads as: 5 = warm-up,
+-- 20-40 = solid, and past 40 every step earns a stronger line.
 local MILESTONE_PRAISE = {
-    zh = { '干得不错', '相当好', '太猛了', '重甲克星', '传说级' },
-    en = { 'nice', 'impressive', 'on fire', 'heavy slayer', 'legendary' },
+    zh = { '才刚热身', '手感来了', '渐入佳境', '这波很稳', '有点东西', '相当能打', '效率很高', '超标发挥', '效率拉满', '反重之神', '已经离谱了' },
+    en = { 'just warming up', 'finding the groove', 'getting there', 'solid', 'on a roll', 'very capable', 'very efficient', 'above baseline', 'max efficiency', 'heavy slayer', 'this is absurd' },
 }
 local function praise_for(level, code)
     local list = MILESTONE_PRAISE[code]
@@ -736,12 +738,12 @@ local function chat_on()
     return e ~= nil and e % 256 ~= 0
 end
 local state = {
-    version = '1.6.0',
+    version = '1.6.1',
     ready = true,
     has_events = eventsReady,
 }
 rawset(_G, key, state)
-mod:log(string.format('heavy kill notice ready v1.6.0 (events=%s host=%s chat=%s names=%d)',
+mod:log(string.format('heavy kill notice ready v1.6.1 (events=%s host=%s chat=%s names=%d)',
     tostring(eventsReady), tostring(is_host()), tostring(chat_on()), ready_names))
 if rawget(_G, 'HeavyKillNoticeTest') then
     state._test = { queue = queue, pump = pump, is_host = is_host, compose = compose,

@@ -388,11 +388,17 @@ for _ = 1, 5 do killed_cb({ type = '1A7FCDFF98C664B0', killer_peer = '0000000111
 tick(40)
 check('milestone: one line for 5 kills', #sends, 1)
 check('milestone: counts 5', sends[1] and (sends[1].text:find('干掉了 5 个重甲单位', 1, true) ~= nil), true)
-check('milestone: praise 1', sends[1] and (sends[1].text:find('干得不错', 1, true) ~= nil), true)
+check('milestone: praise 1', sends[1] and (sends[1].text:find('才刚热身', 1, true) ~= nil), true)
 for _ = 6, 10 do killed_cb({ type = '1A7FCDFF98C664B0', killer_peer = '0000000111111111' }) end
 tick(40)
 check('milestone: counts 10', sends[2] and (sends[2].text:find('干掉了 10 个重甲单位', 1, true) ~= nil), true)
-check('milestone: praise 2', sends[2] and (sends[2].text:find('相当好', 1, true) ~= nil), true)
+check('milestone: praise 2', sends[2] and (sends[2].text:find('手感来了', 1, true) ~= nil), true)
+for _ = 11, 40, 5 do
+    for _ = 1, 5 do killed_cb({ type = '1A7FCDFF98C664B0', killer_peer = '0000000111111111' }) end
+    tick(40)
+end
+check('milestone: 40', sends[8] and (sends[8].text:find('干掉了 40 个重甲单位', 1, true) ~= nil), true)
+check('milestone: praise 40', sends[8] and (sends[8].text:find('超标发挥', 1, true) ~= nil), true)
 values.display = 1
 
 out[#out + 1] = fails == 0 and 'RESULT: ALL PASS' or ('RESULT: ' .. fails .. ' FAILURES')
